@@ -130,14 +130,9 @@ pca.fit(X_train_scaled)
 X_train_scaled_pca = pca.transform(X_train_scaled)
 X_test_scaled_pca = pca.transform(X_test_scaled)
 
-
-# Create labels for PCA components
-labels = ['PC' + str(x) for x in range(1, len(pca.components_) + 1)]
- 
-# Create a DataFrame from the PCA components
-pca_df = pd.DataFrame(pca.components_, columns=labels, index=X_train.columns)
- 
-# Display the transpose of the first 10 rows of the DataFrame
-print(round(pca_df.head(10), 5))
-
-pca_df.describe().round(3)
+# show weight for each component
+pca_dims = []
+for x in range(0, len(pca_df)):
+    pca_dims.append('PCA Component {}'.format(x))
+pca_df = pd.DataFrame(pca.components_, columns=labels, index=pca_dims)
+pca_df.head(10).T
