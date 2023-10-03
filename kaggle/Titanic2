@@ -80,7 +80,7 @@ feature_importances = pd.DataFrame({'feature': X_train.columns, 'importance': im
 feature_importances = feature_importances.sort_values('importance', ascending=False)
 
 # Plot feature importances
-plt.figure(figsize=(8,6))
+plt.figure(figsize=(4,2))
 plt.bar(feature_importances['feature'], feature_importances['importance'])
 plt.xlabel('Features')
 plt.ylabel('Importance')
@@ -124,16 +124,87 @@ pca_df['Explained Variance Ratio'] = evr
 
 display(pca_df.head(5).round(3))
 
+# Create a list of PCA component names
+pca_dims = []
+for x in range(0, len(pca_df)):
+    pca_dims.append('PCA Component {}'.format(x))
 
-pca = PCA(n_components=4)
-pca.fit(X_train_scaled)
-X_train_scaled_pca = pca.transform(X_train_scaled)
-X_test_scaled_pca = pca.transform(X_test_scaled)
+# Create a new DataFrame with the PCA components
+pca_test_df = pd.DataFrame(pca.components_, columns=X_train.columns, index=pca_dims)
+
+# Display the first 10 rows of the DataFrame, rounded to 3 decimal places and transposed
+display(pca_test_df.head(10).round(3).T)
+
+# Import necessary module
+from sklearn.model_selection import RandomizedSearchCV
+
+# Define the hyperparameter grid
+n_estimators = [int(x) for x in np.linspace(start = 100, stop = 1000, num = 10)]
+max_features = ['log2', 'sqrt']
+max_depth = [int(x) for x in np.linspace(start = 1, stop = 15, num = 15)]
+min_samples_split = [int(x) for x in np.linspace(start = 2, stop = 50, num = 10)]
+min_samples_leaf = [int(x) for x in np.linspace(start = 2, stop = 50, num = 10)]
+bootstrap = [True, False]
+param_dist = {'n_estimators': n_estimators,
+               'max_features': max_features,
+               'max_depth': max_depth,
+               'min_samples_split': min_samples_split,
+               'min_samples_leaf': min_samples_leaf,
+               'bootstrap': bootstrap}
+
+# Initialize the RandomizedSearchCV
+rs = RandomizedSearchCV(model, 
+                        param_dist, 
+                        n_iter = 100, 
+                        cv = 3, 
+                        verbose = 1, 
+                        n_jobs=-1, 
+                        random_state=0)
+
+# Fit the RandomizedSearchCV on the scaled and PCA transformed training data
+rs.fit(X_train_scaled, y)
+
+# Print the best parameters
+print(rs.best_params_)
 
 
-+ labels = X_train.columns
-+ pca_dims = []
-+ for x in range(0, len(pca_df)):
-+     pca_dims.append('PCA Component {}'.format(x))
-+ pca_df = pd.DataFrame(pca.components_, columns=labels, index=pca_dims)
-+ pca_df.head(10).T
+# Create a DataFrame from the cv_results_ attribute of the RandomizedSearchCV object
+rs_df = pd.DataFrame(rs.cv_results_).sort_values('rank_test_score').reset_index(drop=True)
+
+# Drop unnecessary columns from the DataFrame
+rs_df = rs_df.drop([
+            'mean_fit_time', 
+            'std_fit_time', 
+            'mean_score_time',
+            'std_score_time', 
+            'params', 
+            'split0_test_score', 
+            'split1_test_score', 
+            'split2_test_score', 
+            'std_test_score'],
+            axis=1)
+
+# Display the first 10 rows of the DataFrame
+rs_df.head(10)
+
+
+# Import necessary libraries
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# Extract the hyperparameters and their corresponding mean test scores
+hyperparameters = rs_df.columns.drop('mean_test_score')
+mean_test_scores = rs_df['mean_test_score']
+
+# For each hyperparameter
+for hyperparameter in hyperparameters:
+    # Create a new DataFrame that maps each unique hyperparameter value to its corresponding mean test score
+    hyperparameter_df = rs_df.groupby(hyperparameter)['mean_test_score'].mean().reset_index()
+    
+    # Plot a vertical bar graph with a more compact size
+    plt.figure(figsize=(6, 3))
+    sns.barplot(x=hyperparameter, y='mean_test_score', data=hyperparameter_df)
+    plt.xlabel('Hyperparameter Values', fontsize=10)
+    plt.ylabel('Mean Test Score', fontsize=10)
+    plt.title(f'Mean Test Score for Different {hyperparameter} Values', fontsize=12)
+    plt.show()
