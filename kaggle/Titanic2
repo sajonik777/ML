@@ -67,7 +67,7 @@ model = RandomForestClassifier(n_estimators=100, max_depth=20, random_state=1)
 model.fit(X_train, y)
 predictions = model.predict(X_test)
 
-print(round(model.score(X, y), 5))
+print(round(model.score(X_train, y), 5))
 # output = pd.DataFrame({'PassengerId': test_data.PassengerId, 'Survived': predictions})
 # output.to_csv('submission.csv', index=False)
 
@@ -130,9 +130,10 @@ pca.fit(X_train_scaled)
 X_train_scaled_pca = pca.transform(X_train_scaled)
 X_test_scaled_pca = pca.transform(X_test_scaled)
 
-# show weight for each component
-pca_dims = []
-for x in range(0, len(pca_df)):
-    pca_dims.append('PCA Component {}'.format(x))
-pca_df = pd.DataFrame(pca.components_, columns=labels, index=pca_dims)
-pca_df.head(10).T
+
++ labels = X_train.columns
++ pca_dims = []
++ for x in range(0, len(pca_df)):
++     pca_dims.append('PCA Component {}'.format(x))
++ pca_df = pd.DataFrame(pca.components_, columns=labels, index=pca_dims)
++ pca_df.head(10).T
