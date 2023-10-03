@@ -111,13 +111,9 @@ cv_results_df = cv_results_df.sort_values(by='rank_test_score')
 # Print the DataFrame
 print(cv_results_df)
 
-# Create four figures and bar plots
-for column in ['param_n_estimators', 'param_max_depth', 'mean_test_score', 'rank_test_score']:
-    fig = plt.figure()
-    fig.set_size_inches(30, 25)
-    sns.barplot(x=cv_results_df.index, y=column, data=cv_results_df)
-    plt.title(f'Bar plot of {column}')
-    plt.show()
+# Create a bar plot
+sns.barplot(x='param_n_estimators', y='mean_test_score', data=cv_results_df)
+plt.show()
 
 # output = pd.DataFrame({'PassengerId': test_data.PassengerId, 'Survived': predictions})
 # output.to_csv('submission.csv', index=False)

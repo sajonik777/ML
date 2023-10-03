@@ -1,0 +1,86 @@
+import numpy as np
+import pandas as pd
+import os
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler
+from sklearn.ensemble import RandomForestClassifier
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+for dirname, _, filenames in os.walk('/kaggle/input'):
+    for filename in filenames:
+        print(os.path.join(dirname, filename))
+
+train_data = pd.read_csv("/kaggle/input/titanic/train.csv")
+median_ages_train = train_data.groupby(['Sex', 'Pclass'])['Age'].median()
+train_data.fillna(0, inplace=True)
+train_data.loc[train_data.Age == 0, 'Age'] = train_data[train_data.Age == 0].apply(lambda row: median_ages_train[row['Sex'], row['Pclass']], axis=1)
+train_data = train_data[train_data.Age >= 10]
+train_data.describe()
+
+test_data = pd.read_csv("/kaggle/input/titanic/test.csv")
+median_ages_test = test_data.groupby(['Sex', 'Pclass'])['Age'].median()
+test_data.fillna(0, inplace=True)
+test_data.loc[test_data.Age == 0, 'Age'] = test_data[test_data.Age == 0].apply(lambda row: median_ages_test[row['Sex'], row['Pclass']], axis=1)
+test_data = test_data[test_data.Age >= 10]
+test_data.describe()
+
+women = train_data.loc[train_data.Sex == 'female']["Survived"]
+rate_women = sum(women)/len(women)
+print("% of women who survived:", rate_women)
+
+men = train_data.loc[train_data.Sex == 'male']["Survived"]
+rate_men = sum(men)/len(men)
+print("% of men who survived:", rate_men)
+
+y = train_data["Survived"]
+features = ["Pclass", "Sex", "Age", "SibSp", "Parch"]
+X = pd.get_dummies(train_data[features])
+X_test = pd.get_dummies(test_data[features])
+
+model = RandomForestClassifier(n_estimators=100, max_depth=20, random_state=1)
+model.fit(X, y)
+predictions = model.predict(X_test)
+
+print(round(model.score(X, y), 3))
+output = pd.DataFrame({'PassengerId': test_data.PassengerId, 'Survived': predictions})
+output.to_csv('submission.csv', index=False)
+
+print("Your submission was successfully saved!")
+
+# Extract feature importances
+importances = model.feature_importances_
+feature_importances = pd.DataFrame({'feature': X.columns, 'importance': importances})
+feature_importances = feature_importances.sort_values('importance', ascending=False)
+
+# Plot feature importances
+plt.figure(figsize=(8,6))
+plt.bar(feature_importances['feature'], feature_importances['importance'])
+plt.xlabel('Features')
+plt.ylabel('Importance')
+plt.title('Feature importances from RandomForestClassifier')
+plt.show()
+
+# Standardize the features
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X)
+
+# Apply PCA
+pca = PCA(n_components=6)
+principalComponents = pca.fit_transform(X_scaled)
+
+# Get the explained variance ratio
+explained_variance_ratio = pca.explained_variance_ratio_
+
+# Set seaborn style
+sns.set(style='whitegrid')
+
+# Plot the cumulative sum of the explained variance ratio
+plt.plot(np.cumsum(explained_variance_ratio))
+plt.xlabel('number of components')
+plt.ylabel('cumulative explained variance')
+
+# Add a vertical dashed red line at x=10
+plt.axvline(linewidth=4, color='r', linestyle = '--', x=10, ymin=0, ymax=1)
+# Display the plot
+plt.show()
