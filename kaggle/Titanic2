@@ -39,31 +39,11 @@ test_data.loc[test_data.Age == 0, 'Age'] = test_data[test_data.Age == 0].apply(l
 
 test_data.describe()
 
-# Add the 'age_old' column to both 'train_data' and 'test_data' DataFrames
-train_data['age_old'] = np.where(train_data['Age'] > 70, 1, 0)
-test_data['age_old'] = np.where(test_data['Age'] > 70, 1, 0)
-
-# Set the 'Survived' column to 0 for passengers where 'age_old' is 1 in the 'train_data' DataFrame
-train_data.loc[train_data['age_old'] == 1, 'Survived'] = 0
 
 women = train_data.loc[train_data.Sex == 'female']["Survived"]
 rate_women = sum(women)/len(women)
 
 print("% of women who survived:", rate_women)
-
-# Filter the 'train_data' DataFrame where 'Age' is less than 16
-age_less_than_16 = train_data[train_data['Age'] < 16]
-
-# From 'age_less_than_16', filter the rows where 'Survived' is 1
-survived_age_less_than_16 = age_less_than_16[age_less_than_16['Survived'] == 1]
-
-# Calculate the percentage of survival
-percentage_survival = (len(survived_age_less_than_16) / len(age_less_than_16)) * 100
-
-# Print the calculated percentage
-print("Percentage of passengers under 16 who survived: ", percentage_survival)
-
-survived_age_less_than_16.head()
 
 men = train_data.loc[train_data.Sex == 'male']["Survived"]
 rate_men = sum(men)/len(men)
@@ -74,13 +54,7 @@ from sklearn.ensemble import RandomForestClassifier
 
 y = train_data["Survived"]
 
-# Create a new column 'is_minor' in both 'train_data' and 'test_data' DataFrames
-train_data['is_minor'] = np.where(train_data['Age'] < 16, 1, 0)
-test_data['is_minor'] = np.where(test_data['Age'] < 16, 1, 0)
-
-# Add 'age_old' to the features array
-features = ["Sex", "Pclass", "Fare", "is_minor", "Parch", "age_old"]
-
+features = ["Sex", "Pclass", "Fare", "Parch"]
 X_train = pd.get_dummies(train_data[features])
 X_test = pd.get_dummies(test_data[features])
 
@@ -89,8 +63,9 @@ scaler = StandardScaler()
 X_train_scaled = scaler.fit_transform(X_train)
 X_test_scaled = scaler.fit_transform(X_test)
 
+
 # Apply PCA
-pca = PCA(n_components=6)
+pca = PCA(n_components=5)
 principalComponents = pca.fit_transform(X_train_scaled)
 X_train_scaled_pca = pca.transform(X_train_scaled)
 X_test_scaled_pca = pca.transform(X_test_scaled)
