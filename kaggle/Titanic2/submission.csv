@@ -1,0 +1,220 @@
+# This Python 3 environment comes with many helpful analytics libraries installed
+# It is defined by the kaggle/python Docker image: https://github.com/kaggle/docker-python
+# For example, here's several helpful packages to load
+
+import numpy as np # linear algebra
+import pandas as pd # data processing, CSV file I/O (e.g. pd.read_csv)
+import matplotlib.pyplot as plt
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler
+import seaborn as sns
+from sklearn.model_selection import GridSearchCV, KFold
+from sklearn.neighbors import KNeighborsRegressor
+from scipy import stats
+
+
+# Input data files are available in the read-only "../input/" directory
+# For example, running this (by clicking run or pressing Shift+Enter) will list all files under the input directory
+
+import os
+for dirname, _, filenames in os.walk('/kaggle/input'):
+    for filename in filenames:
+        print(os.path.join(dirname, filename))
+    
+
+# You can write up to 20GB to the current directory (/kaggle/working/) that gets preserved as output when you create a version using "Save & Run All" 
+# You can also write temporary files to /kaggle/temp/, but they won't be saved outside of the current session
+
+train_data = pd.read_csv("/kaggle/input/titanic/train.csv")
+
+# Feature Engineering
+# Update the 'Embarked' column for passengers with ID "830" and "62"
+train_data.loc[train_data['PassengerId'].isin([830, 62]), 'Embarked'] = 'S'
+
+# Drop rows where 'Age' is NaN
+train_data.dropna(subset=['Age'], inplace=True)
+
+# Add condition, if male traveled alone then survived=0
+Alone = (train_data['SibSp'] + train_data['Parch'] == 0) & (train_data['Sex'] == 'male') & (train_data['Age'] > 17)
+train_data.loc[Alone, 'Survived'] = 0
+train_data['Alone'] = Alone.astype(int)
+
+# Add condition, all women and children (age 1-17) have survived value=1
+Women_Children = (train_data['Sex'] == 'female') | ((train_data['Age'] >= 1) & (train_data['Age'] <= 17))
+train_data.loc[Women_Children, 'Survived'] = 1
+
+# Add condition, if female from 17 to 65 then survived=1
+Women = (train_data['Sex'] == 'female') & ((train_data['Age'] >= 17) & (train_data['Age'] <= 65))
+train_data.loc[Women, 'Survived'] = 1
+
+# Add condition, if children (both male and female) from 5 to 17 then survived=1
+Children = ((train_data['Age'] >= 5) & (train_data['Age'] <= 17))
+train_data.loc[Children, 'Survived'] = 1
+
+train_data.head(5)
+
+train_data.describe().round(1)
+
+test_data = pd.read_csv("/kaggle/input/titanic/test.csv")
+
+average_ages_test = test_data.groupby(['Sex', "Parch"])['Age'].mean()
+test_data.fillna(0, inplace=True)
+
+test_data.loc[test_data.Age == 0, 'Age'] = test_data[test_data.Age == 0].apply(lambda row: average_ages_test[row['Sex'], row['Parch']], axis=1)
+
+# Add condition, if male traveled alone then survived=0
+Alone = (test_data['SibSp'] + test_data['Parch'] == 0) & (test_data['Sex'] == 'male') & (test_data['Age'] > 17)
+test_data['Alone'] = Alone.astype(int)
+
+# Add condition, all women and children (age 1-17) have survived value=1
+Women_Children = (test_data['Sex'] == 'female') | ((test_data['Age'] >= 1) & (test_data['Age'] <= 17))
+test_data.loc[Women_Children, 'Survived'] = 1
+
+# Add condition, if female from 17 to 65 then survived=1
+Women = (test_data['Sex'] == 'female') & ((test_data['Age'] >= 17) & (test_data['Age'] <= 65))
+test_data.loc[Women, 'Survived'] = 1
+
+# Add condition, if children (both male and female) from 5 to 17 then survived=1
+Children = ((test_data['Age'] >= 5) & (test_data['Age'] <= 17))
+test_data.loc[Children, 'Survived'] = 1
+
+test_data.head(5)
+
+women = train_data.loc[train_data.Sex == 'female']["Survived"]
+rate_women = sum(women)/len(women)
+
+print("% of women who survived:", rate_women)
+
+# Calculate survival rate for children (age 1-17)
+children = train_data.loc[(train_data.Age >= 1) & (train_data.Age <= 17)]["Survived"]
+rate_children = sum(children)/len(children)
+
+print("% of children who survived:", rate_children)
+
+print("% of women and children who survived:", round((rate_women + rate_children) / 2, 3))
+
+men = train_data.loc[train_data.Sex == 'male']["Survived"]
+rate_men = sum(men)/len(men)
+
+print("% of men who survived:", rate_men)
+
+from sklearn.ensemble import RandomForestClassifier
+
+y = train_data["Survived"]
+
+features = ["Sex", "Pclass", "Fare", "Parch", "SibSp", "Alone"]
+X_train = pd.get_dummies(train_data[features])
+X_test = pd.get_dummies(test_data[features])
+
+# Apply PCA
+pca = PCA(n_components=5)
+principalComponents = pca.fit_transform(X_train)
+X_train_pca = pca.transform(X_train)
+X_test_pca = pca.transform(X_test)
+
+# Define a parameter grid for the RandomForestClassifier
+param_grid = {
+    'n_estimators': [50, 100, 200],
+    'max_depth': [5, 10, 15, None],
+    'random_state': [0]
+}
+
+# Initialize a GridSearchCV object with the RandomForestClassifier and the parameter grid
+grid_search = GridSearchCV(RandomForestClassifier(), param_grid, cv=5, scoring='accuracy')
+
+# Fit the GridSearchCV object to the training data
+grid_search.fit(X_train_pca, y)
+
+# Print out the best parameters found by GridSearchCV
+print("Best parameters found by GridSearchCV:", grid_search.best_params_)
+
+model = RandomForestClassifier(n_estimators=100, max_depth=10, random_state=0)
+model.fit(X_train_pca, y)
+predictions = model.predict(X_test_pca)
+
+print("Model score:", model.score(X_train_pca, y))
+
+output = pd.DataFrame({'PassengerId': test_data.PassengerId, 'Survived': predictions})
+output.to_csv('/kaggle/Titanic2/submission.csv', index=False)
+
+print("Your submission was successfully saved!")
+
+from sklearn.tree import DecisionTreeRegressor
+
+from sklearn.metrics import mean_absolute_error
+# We take the average of absolute errors. 
+# This is our measure of model quality 
+
+from sklearn.model_selection import train_test_split
+
+# split data into training and validation data, for both features and target
+# The split is based on a random number generator. Supplying a numeric value to
+# the random_state argument guarantees we get the same split every time we
+# run this script.
+
+train_X, val_X, train_y, val_y = train_test_split(X_train_pca, y, random_state = 0)
+# Define model
+model_dtr = DecisionTreeRegressor()
+# Fit model
+model_dtr.fit(train_X, train_y)
+
+# get predicted on validation data
+val_predictions = model_dtr.predict(val_X)
+
+mae_leaf = mean_absolute_error(val_y, val_predictions)
+print("Mean absolute error for out-of-sample data is:", mae_leaf)
+
+# define get_mae function that takes the maximum number of leaf nodes for dtr
+def get_mae(max_leaf_nodes, train_X, val_X, train_y, val_y):
+    
+# define training and validation data for features and target    
+    model_leaf = DecisionTreeRegressor(max_leaf_nodes=max_leaf_nodes, random_state=0)
+    
+# fit the model to the training data    
+    model_leaf.fit(train_X, train_y)
+    
+# makes predictions on the validation data    
+    preds_val = model_leaf.predict(val_X)
+    
+# calculates the mean absolute error    
+    mae_leaf = mean_absolute_error(val_y, preds_val)
+    
+    return(mae_leaf)
+    
+    # compare MAE with differing values of max_leaf_nodes
+for max_leaf_nodes in [5, 50, 500, 5000]:
+    my_mae = get_mae(max_leaf_nodes, train_X, val_X, train_y, val_y)
+    print("Max leaf nodes: %d  \t\t Mean Absolute Error:  %f" %(max_leaf_nodes, my_mae))
+    
+    
+# Get the explained variance ratio
+explained_variance_ratio = pca.explained_variance_ratio_
+
+# Set seaborn style
+sns.set(style='whitegrid')
+ 
+# Plot the cumulative sum of the explained variance ratio
+plt.plot(np.cumsum(explained_variance_ratio))
+plt.xlabel('number of components')
+plt.ylabel('cumulative explained variance')
+ 
+# Add a vertical dashed red line at x=10
+plt.axvline(linewidth=2, color='r', linestyle = '--', x=5, ymin=0, ymax=1)
+ 
+# Display the plot
+plt.show()
+
+# Creating a DataFrame that summarizes how much of the variance is explained by each principal component
+evr = pca.explained_variance_ratio_
+cvr = np.cumsum(pca.explained_variance_ratio_)
+pca_df = pd.DataFrame()
+pca_df['Cumulative Variance Ratio'] = cvr
+pca_df['Explained Variance Ratio'] = evr
+
+display(pca_df.head(10).round(3))
+
+pca_dims = []
+for x in range(0, len(pca_df)):
+    pca_dims.append('PCA Component {}'.format(x))
+pca_test_df = pd.DataFrame(pca.components_, columns=X_train.columns, index=pca_dims)
+pca_test_df.head(10).round(3).T
