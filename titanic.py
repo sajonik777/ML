@@ -13,13 +13,10 @@ from sklearn.neighbors import KNeighborsRegressor
 from scipy import stats
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.ensemble import RandomForestRegressor
-
 from sklearn.metrics import mean_absolute_error
-# We take the average of absolute errors. 
-# This is our measure of model quality 
 from sklearn.model_selection import GridSearchCV, KFold
-
-
+from sklearn.model_selection import train_test_split
+from sklearn.feature_selection import SelectKBest, f_classif
 
 # Input data files are available in the read-only "../input/" directory
 # For example, running this (by clicking run or pressing Shift+Enter) will list all files under the input directory
@@ -42,15 +39,22 @@ train_data.loc[train_data['PassengerId'].isin([830, 62]), 'Embarked'] = 'S'
 # Drop rows where 'Age' is NaN
 train_data.dropna(subset=['Age'], inplace=True)
 
+# Calculate the mean age for each combination of 'Sex' and 'Pclass'
+mean_ages = train_data.groupby(['Sex', 'Pclass'])['Age'].mean()
+
+# Replace the missing 'Age' values with the mean age of the corresponding 'Sex' and 'Pclass'
+train_data.loc[train_data.Age.isnull(), 'Age'] = train_data[train_data.Age.isnull()].apply(lambda row: mean_ages[row['Sex'], row['Pclass']], axis=1)
+
 # Add condition, if male traveled alone then survived=0
 Alone = (train_data['SibSp'] + train_data['Parch'] == 0) & (train_data['Sex'] == 'male') & (train_data['Age'] > 17)
 train_data.loc[Alone, 'Survived'] = 0
-train_data['Alone'] = Alone.astype(int)
+train_data.loc[Alone, 'Alone'] = train_data.loc[Alone, 'Survived']
 
 # if female from 17 to 65 then survived=1
 Women = (train_data['Sex'] == 'female') & ((train_data['Age'] >= 17) & (train_data['Age'] <= 65))
 train_data.loc[Women, 'Survived'] = 1
-train_data['Women'] = Women.astype(int)
+train_data.loc[Women, 'Women'] = train_data.loc[Women, 'Survived']
+train_data.loc[~Women, 'Women'] = 0
 
 # if children (both male and female) from 5 to 17 then survived=1
 Children = ((train_data['Age'] >= 3) & (train_data['Age'] <= 15))
@@ -70,7 +74,8 @@ test_data.loc[test_data.Age == 0, 'Age'] = test_data[test_data.Age == 0].apply(l
 # if female from 17 to 65 then survived=1
 Women = (test_data['Sex'] == 'female') & ((test_data['Age'] >= 17) & (test_data['Age'] <= 65))
 test_data.loc[Women, 'Survived'] = 1
-test_data['Women'] = Women.astype(int)
+test_data.loc[Women, 'Women'] = test_data.loc[Women, 'Survived']
+test_data.loc[~Women, 'Women'] = 0
 
 # if children (both male and female) from 5 to 17 then survived=1
 Children = ((test_data['Age'] >= 3) & (test_data['Age'] <= 15))
@@ -82,7 +87,7 @@ test_data['Children'] = Children.astype(int)
 
 # Add condition, if male traveled alone then survived=0
 Alone = (test_data['SibSp'] + test_data['Parch'] == 0) & (test_data['Sex'] == 'male')
-test_data['Alone'] = Alone.astype(int)
+test_data.loc[Alone, 'Alone'] = test_data.loc[Alone, 'Survived']
 
 test_data.fillna(0, inplace=True)
 
@@ -134,8 +139,6 @@ output = pd.DataFrame({'PassengerId': test_data.PassengerId, 'Survived': predict
 output.to_csv('submission.csv', index=False)
 
 print("Your submission was successfully saved!")
-
-from sklearn.model_selection import train_test_split
 
 # split data into training and validation data, for both features and target
 # The split is based on a random number generator. Supplying a numeric value to
@@ -209,4 +212,48 @@ plt.ylabel('cumulative explained variance')
 plt.axvline(linewidth=2, color='r', linestyle = '--', x=5, ymin=0, ymax=1)
  
 # Display the plot
+plt.show()
+
+# After training the model, we extract the feature importances
+importances = model.feature_importances_
+
+# We create a pandas DataFrame that maps these importance scores back to the feature names
+feature_importances = pd.DataFrame({"feature": X_train.columns, "importance": importances})
+
+# We sort this DataFrame by the importance scores in descending order
+feature_importances = feature_importances.sort_values("importance", ascending=False)
+
+# We create a bar plot using matplotlib, with the feature names on the y-axis and their importance scores on the x-axis
+plt.figure(figsize=(10, 6))
+sns.barplot(x="importance", y="feature", data=feature_importances, palette="viridis")
+
+# We set the title of the plot and display it
+plt.title("Feature Importance")
+plt.show()
+
+# Define the features and target variable
+features = ["Women", "Children", "Sex"]
+X_train = pd.get_dummies(train_data[features])
+y = train_data["Survived"]
+
+# Use SelectKBest with f_classif as the scoring function to select the top K features
+selector = SelectKBest(f_classif, k=5)
+
+# Fit the SelectKBest object to the training data
+selector.fit(X_train, y)
+
+# Get the scores and p-values of the feature selection process
+scores = selector.scores_
+pvalues = selector.pvalues_
+
+# Create a DataFrame with the scores and p-values
+df_scores = pd.DataFrame({'Feature': X_train.columns, 'Score': scores, 'PValue': pvalues})
+
+# Sort the DataFrame by Score in descending order
+df_scores = df_scores.sort_values('Score', ascending=False)
+
+# Display the top K features in a colorful plot using seaborn
+plt.figure(figsize=(10, 6))
+sns.barplot(data=df_scores, x='Score', y='Feature', palette='viridis')
+plt.title('Top 5 Features based on SelectKBest Scores')
 plt.show()
