@@ -35,16 +35,10 @@ result = pd.merge(dates, average_diff, left_on='day_of_year', right_index=True)
 # Round the 'price_diff' column to zero decimal places
 result['price_diff'] = result['price_diff'].round(0)
 
-# Convert the 'date' column back to datetime format
-result['date'] = pd.to_datetime(result['date'], format='%d.%m.%Y')
-
-# Filter the DataFrame to include only November and December
-result = result[result['date'].dt.month.isin([11, 12])]
-
 # Create a vertical bar plot
 plt.figure(figsize=(10, 6))
 colors = cm.rainbow(np.linspace(0, 1, len(result)))
-plt.bar(result['date'].dt.strftime('%d.%m.%Y'), result['price_diff'], color=colors)
+plt.bar(result['date'], result['price_diff'], color=colors)
 plt.xticks(rotation=90)
 plt.xlabel('Date')
 plt.ylabel('Average Price Difference')
