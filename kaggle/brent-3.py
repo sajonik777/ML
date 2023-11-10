@@ -52,4 +52,4 @@ def plot_year_month(year, month):
     plt.show()
 
 # Call the function with the desired year and month
-plot_year_month(2020, 1)
+plot_year_month(2023, 7)
