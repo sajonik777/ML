@@ -3,10 +3,6 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-# Load the data
-#brent_data = pd.read_csv("/kaggle/input/brent-4/brent_seasonality_comma-2.txt")
-#brent_data.head()
-
 # Function to plot data for a specific year
 def plot_year_month(year, month):
     # Load the data
@@ -19,8 +15,8 @@ def plot_year_month(year, month):
     brent_data = brent_data[(brent_data['date'].dt.year == year) & (brent_data['date'].dt.month == month)]
 
     # Identify the increasing and decreasing sequences
-    brent_data['increasing'] = brent_data['price'] >= brent_data['price'].shift(1)
-    brent_data['decreasing'] = brent_data['price'] <= brent_data['price'].shift(1)
+    brent_data['increasing'] = True
+    brent_data['decreasing'] = True
 
     # Calculate the sequence lengths
     brent_data['increasing_sequence'] = brent_data['increasing'].cumsum()
@@ -32,8 +28,8 @@ def plot_year_month(year, month):
     brent_data.loc[brent_data['price'] > brent_data['price'].shift(2), 'decreasing_sequence'] = 0
 
     # Filter the increasing and decreasing sequences
-    increasing_sequences = brent_data[(brent_data['increasing_sequence'] > 0) & (brent_data['price'] >= brent_data['price'].shift(2))]
-    decreasing_sequences = brent_data[(brent_data['decreasing_sequence'] > 0) & (brent_data['price'] <= brent_data['price'].shift(2))]
+    increasing_sequences = brent_data[(brent_data['increasing_sequence'] > 0) & (brent_data['increasing'] == True)]
+    decreasing_sequences = brent_data[(brent_data['decreasing_sequence'] > 0) & (brent_data['decreasing'] == True)]
 
     # Create a subplot for each month
     fig, ax = plt.subplots(figsize=(10, 6))
