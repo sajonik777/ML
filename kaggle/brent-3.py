@@ -1,22 +1,22 @@
+import matplotlib.dates as mdates
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-import matplotlib.dates as mdates
 
 # Load the data
 #brent_data = pd.read_csv("/kaggle/input/brent-4/brent_seasonality_comma-2.txt")
 #brent_data.head()
 
 # Function to plot data for a specific year
-def plot_year(year):
+def plot_year_month(year, month):
     # Load the data
     brent_data = pd.read_csv("/kaggle/input/brent-4/brent_seasonality_comma-2.txt")
 
     # Parse the 'date' column to datetime format
     brent_data['date'] = pd.to_datetime(brent_data['date'], format='%d.%m.%Y')
 
-    # Filter data for the specified year
-    brent_data = brent_data[brent_data['date'].dt.year == year]
+    # Filter data for the specified year and month
+    brent_data = brent_data[(brent_data['date'].dt.year == year) & (brent_data['date'].dt.month == month)]
 
     # Identify the increasing and decreasing sequences
     brent_data['increasing'] = brent_data['price'] >= brent_data['price'].shift(1)
@@ -31,29 +31,29 @@ def plot_year(year):
     brent_data.loc[brent_data['price'] < brent_data['price'].shift(2), 'increasing_sequence'] = 0
     brent_data.loc[brent_data['price'] > brent_data['price'].shift(2), 'decreasing_sequence'] = 0
 
-    # Group the data by month
-    grouped = brent_data.groupby(brent_data['date'].dt.month)
+    # Filter the increasing and decreasing sequences
+    increasing_sequences = brent_data[(brent_data['increasing_sequence'] > 0) & (brent_data['price'] >= brent_data['price'].shift(2))]
+    decreasing_sequences = brent_data[(brent_data['decreasing_sequence'] > 0) & (brent_data['price'] <= brent_data['price'].shift(2))]
 
     # Create a subplot for each month
-    fig, axs = plt.subplots(len(grouped), 1, figsize=(10, 6 * len(grouped)))
+    fig, ax = plt.subplots(figsize=(10, 6))
 
-    for (month, data), ax in zip(grouped, axs):
-        # Extract the increasing and decreasing sequences for this month
-        increasing_sequences = data[data['increasing_sequence'] > 0]
-        decreasing_sequences = data[data['decreasing_sequence'] > 0]
+    # Plot the increasing and decreasing sequences on this subplot
+    for _, sequence in increasing_sequences.groupby(brent_data['increasing_sequence']):
+        ax.plot(sequence['date'], sequence['price'], color='red', linewidth=2, marker='o')
+    for _, sequence in decreasing_sequences.groupby(brent_data['decreasing_sequence']):
+        ax.plot(sequence['date'], sequence['price'], color='green', linewidth=2, marker='o')
 
-        # Plot the increasing and decreasing sequences on this subplot
-        for _, sequence in increasing_sequences.groupby(data['increasing_sequence']):
-            ax.plot(sequence['date'], sequence['price'], color='red')
-        for _, sequence in decreasing_sequences.groupby(data['decreasing_sequence']):
-            ax.plot(sequence['date'], sequence['price'], color='green')
-
-        ax.set_xlabel('Date')
-        ax.set_ylabel('Price')
-        ax.set_title(f'Increasing and Decreasing Price Sequences in {year}-{month:02d}')
+    ax.set_xlabel('Date')
+    ax.set_ylabel('Price')
+    ax.set_title(f'Increasing and Decreasing Price Sequences in {year}-{month:02d}', fontsize=16)
+    ax.xaxis.set_major_formatter(mdates.DateFormatter('%d'))
+    ax.xaxis.set_major_locator(mdates.DayLocator())
+    plt.xticks(rotation=45)
+    ax.grid(True)
 
     plt.tight_layout()
     plt.show()
 
-# Call the function with the desired year
-plot_year(2020)
+# Call the function with the desired year and month
+plot_year_month(2020, 1)
